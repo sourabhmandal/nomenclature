@@ -6,51 +6,72 @@ import (
 	"fmt"
 	"gosolid/internal/general"
 	"gosolid/internal/repository"
+	"gosolid/internal/translation"
 	"gosolid/internal/user"
 	"gosolid/pkg/database"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
 
+	env "github.com/caarlos0/env/v11"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 )
 
-func main() {
-	serverPort, _ := strconv.Atoi(os.Getenv("SERVER_PORT"))
-	databaseName := os.Getenv("DB_DATABASE")
-	password := os.Getenv("DB_PASSWORD")
-	username := os.Getenv("DB_USERNAME")
-	host := os.Getenv("DB_HOST")
-	dbport, _ := strconv.Atoi(os.Getenv("DB_PORT"))
-	schema := os.Getenv("DB_SCHEMA")
+type EnvConfig struct {
+	DBDatabase               string `env:"DB_DATABASE"`
+	DBUsername               string `env:"DB_USERNAME"`
+	DBPassword               string `env:"DB_PASSWORD"`
+	DBHost                   string `env:"DB_HOST"`
+	DBPort                   int    `env:"DB_PORT"`
+	DBSchema                 string `env:"DB_SCHEMA"`
+	ServerPort               int    `env:"SERVER_PORT"`
+	GoogleTranslateAPIKey    string `env:"GOOGLE_TRANSLATE_API_KEY"`
+	GoogleTranslateProjectID string `env:"GOOGLE_TRANSLATE_PROJECT_ID"`
+}
 
+var ENV EnvConfig = EnvConfig{}
+
+func LoadEnvConfig() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Error loading .env file:", err)
+	}
+
+	if err := env.ParseWithOptions(&ENV, env.Options{
+		RequiredIfNoDef: true,
+	}); err != nil {
+		fmt.Println(err)
+	}
+}
+
+func main() {
+	// Env config loading
+	LoadEnvConfig()
 	// Declare a flag to run migrations only
 	migrateFlag := flag.Bool("migrate", false, "run migrations only")
 	// Parse the flags
 	flag.Parse()
 
 	if *migrateFlag {
-		migrateDatabase(username, password, host, databaseName, schema, dbport)
+		migrateDatabase(ENV.DBUsername, ENV.DBPassword, ENV.DBHost, ENV.DBDatabase, ENV.DBSchema, ENV.DBPort)
 		return
 	}
 	// Create a done channel to signal when the shutdown is complete
 	done := make(chan bool, 1)
 
-	dbInst, db := database.NewDatabasePg(username, password, host, databaseName, schema, dbport)
+	dbInst, db := database.NewDatabasePg(ENV.DBUsername, ENV.DBPassword, ENV.DBHost, ENV.DBDatabase, ENV.DBSchema, ENV.DBPort)
 
 	newServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", serverPort),
+		Addr:    fmt.Sprintf(":%d", ENV.ServerPort),
 		Handler: registerRoutes(dbInst, db),
 	}
 	// Run graceful shutdown in a separate goroutine
@@ -83,6 +104,15 @@ func registerRoutes(dbInst database.Database, db *pgx.Conn) *gin.Engine {
 	userRouter := router.Group("/user")
 	userRouter.POST("/", userHandlers.RegisterUser)
 	userRouter.GET("/", userHandlers.GetAllUsers)
+
+	// translation service wiring (stub adapters)
+	googleTranslationProvider := translation.NewGoogleTranslateProvider(ENV.GoogleTranslateAPIKey, ENV.GoogleTranslateProjectID)
+	translationService := translation.NewTranslationService(
+		googleTranslationProvider,
+		nil, // TODO: implement memory
+	)
+	translationRouter := translation.NewTranslationHandler(translationService)
+	router.POST("/translate", translationRouter.TranslateHandler)
 
 	return router
 }
