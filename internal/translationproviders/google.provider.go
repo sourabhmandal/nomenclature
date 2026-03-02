@@ -52,5 +52,6 @@ func (g *googleTranslateProvider) Translate(req TranslationRequest) (Translation
 		Provider:   "google",
 		Original:   req.Text,
 		Translated: tr.TranslatedText,
+		Confidence: 9,
 	}, nil
 }

@@ -10,10 +10,14 @@ type TranslationRequest struct {
 
 // TranslationResult represents the result of a translation.
 type TranslationResult struct {
-	Original   string  `json:"original"`
-	Translated string  `json:"translated"`
-	Confidence float64 `json:"confidence"`
-	Provider   string  `json:"provider"`
+	CompanyID      int64   `json:"company_id"`
+	NormalizedHash string  `json:"hash"`
+	SourceLanguage string  `json:"source_language"`
+	TargetLanguage string  `json:"target_language"`
+	Original       string  `json:"original"`
+	Translated     string  `json:"translated"`
+	Confidence     float64 `json:"confidence"`
+	Provider       *string `json:"provider"`
 }
 
 // ConfidenceScore holds scoring details for a translation.
