@@ -33,3 +33,4 @@ main
 .DS_Store
 sow.md
 service-account.json
+__debug*
