@@ -51,9 +51,13 @@ watch:
         fi
 
 genmigrate:
-	@echo "Generating migration..."
+	@if [ -z "$(name)" ]; then \
+		 echo "Error: Please provide a migration name using 'make genmigrate name=your_migration_name'"; \
+		 exit 1; \
+	fi
+	@echo "Generating migration: $(name)"
 	@sqlc generate
-	@atlas migrate diff initial --dir "file://pkg/migrations" --dev-url "docker://postgres/18/nomenclature?search_path=public" --to file://pkg/schema.sql
+	@atlas migrate diff $(name) --dir "file://pkg/migrations" --dev-url "docker://postgres/18/nomenclature?search_path=public" --to file://pkg/schema.sql
 
 migrate:
 	@echo "Migrating..."
