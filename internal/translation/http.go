@@ -6,11 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Handler exposes translation APIs.
-type TranslationHandler interface {
-	TranslateHandler(c *gin.Context)
-}
-
 type translationHandler struct {
 	service TranslationService
 }

@@ -5,10 +5,11 @@ import (
 	"log"
 	"time"
 
+	"context"
+
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
-	"golang.org/x/net/context"
 )
 
 // Service represents a service that interacts with a database.

@@ -7,20 +7,76 @@ package repository
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getTranslationByHash = `-- name: GetTranslationByHash :one
-SELECT id, normalized_hash, language_code, original_text, translated_text, confidence_score, provider, created_at FROM translations
-WHERE id = $1 LIMIT 1
+SELECT id, company_id, normalized_hash, source_language, target_language, original_text, translated_text, confidence_score, provider, created_at FROM translations
+WHERE company_id = $1 AND normalized_hash = $2 LIMIT 1
 `
 
-func (q *Queries) GetTranslationByHash(ctx context.Context, id int32) (*Translation, error) {
-	row := q.db.QueryRow(ctx, getTranslationByHash, id)
+type GetTranslationByHashParams struct {
+	CompanyID      *int64 `db:"company_id" json:"company_id"`
+	NormalizedHash string `db:"normalized_hash" json:"normalized_hash"`
+}
+
+func (q *Queries) GetTranslationByHash(ctx context.Context, arg *GetTranslationByHashParams) (*Translation, error) {
+	row := q.db.QueryRow(ctx, getTranslationByHash, arg.CompanyID, arg.NormalizedHash)
 	var i Translation
 	err := row.Scan(
 		&i.ID,
+		&i.CompanyID,
 		&i.NormalizedHash,
-		&i.LanguageCode,
+		&i.SourceLanguage,
+		&i.TargetLanguage,
+		&i.OriginalText,
+		&i.TranslatedText,
+		&i.ConfidenceScore,
+		&i.Provider,
+		&i.CreatedAt,
+	)
+	return &i, err
+}
+
+const saveTranslationByHash = `-- name: SaveTranslationByHash :one
+INSERT INTO translations (company_id, normalized_hash, source_language, target_language, original_text, translated_text, confidence_score, provider)
+SELECT $1, $2, $3, $4, $5, $6, $7, $8
+WHERE NOT EXISTS (
+	SELECT 1 FROM translations WHERE company_id = $1 AND normalized_hash = $2 AND source_language = $3 AND target_language = $4
+)
+RETURNING id, company_id, normalized_hash, source_language, target_language, original_text, translated_text, confidence_score, provider, created_at
+`
+
+type SaveTranslationByHashParams struct {
+	CompanyID       *int64         `db:"company_id" json:"company_id"`
+	NormalizedHash  string         `db:"normalized_hash" json:"normalized_hash"`
+	SourceLanguage  string         `db:"source_language" json:"source_language"`
+	TargetLanguage  string         `db:"target_language" json:"target_language"`
+	OriginalText    string         `db:"original_text" json:"original_text"`
+	TranslatedText  string         `db:"translated_text" json:"translated_text"`
+	ConfidenceScore pgtype.Numeric `db:"confidence_score" json:"confidence_score"`
+	Provider        *string        `db:"provider" json:"provider"`
+}
+
+func (q *Queries) SaveTranslationByHash(ctx context.Context, arg *SaveTranslationByHashParams) (*Translation, error) {
+	row := q.db.QueryRow(ctx, saveTranslationByHash,
+		arg.CompanyID,
+		arg.NormalizedHash,
+		arg.SourceLanguage,
+		arg.TargetLanguage,
+		arg.OriginalText,
+		arg.TranslatedText,
+		arg.ConfidenceScore,
+		arg.Provider,
+	)
+	var i Translation
+	err := row.Scan(
+		&i.ID,
+		&i.CompanyID,
+		&i.NormalizedHash,
+		&i.SourceLanguage,
+		&i.TargetLanguage,
 		&i.OriginalText,
 		&i.TranslatedText,
 		&i.ConfidenceScore,

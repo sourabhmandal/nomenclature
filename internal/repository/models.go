@@ -8,10 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Company struct {
+	ID        int32            `db:"id" json:"id"`
+	Name      string           `db:"name" json:"name"`
+	CreatedAt pgtype.Timestamp `db:"created_at" json:"created_at"`
+}
+
 type Translation struct {
 	ID              int32            `db:"id" json:"id"`
+	CompanyID       *int64           `db:"company_id" json:"company_id"`
 	NormalizedHash  string           `db:"normalized_hash" json:"normalized_hash"`
-	LanguageCode    string           `db:"language_code" json:"language_code"`
+	SourceLanguage  string           `db:"source_language" json:"source_language"`
+	TargetLanguage  string           `db:"target_language" json:"target_language"`
 	OriginalText    string           `db:"original_text" json:"original_text"`
 	TranslatedText  string           `db:"translated_text" json:"translated_text"`
 	ConfidenceScore pgtype.Numeric   `db:"confidence_score" json:"confidence_score"`

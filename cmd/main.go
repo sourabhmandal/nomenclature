@@ -8,6 +8,7 @@ import (
 	"nomenclature/internal/general"
 	"nomenclature/internal/repository"
 	"nomenclature/internal/translation"
+	"nomenclature/internal/translationproviders"
 	"nomenclature/internal/user"
 	"nomenclature/pkg/database"
 	"os/signal"
@@ -92,10 +93,10 @@ func registerRoutes(dbInst database.Database, db *pgx.Conn) *gin.Engine {
 	userRouter.GET("/", userHandlers.GetAllUsers)
 
 	// translation service wiring (stub adapters)
-	googleTranslationProvider := translation.NewGoogleTranslateProvider(ENV.GoogleTranslateAPIKey, ENV.GoogleTranslateProjectID)
+	googleTranslationProvider := translationproviders.NewGoogleTranslateProvider(ENV.GoogleTranslateProjectID)
 	translationService := translation.NewTranslationService(
 		googleTranslationProvider,
-		nil, // TODO: implement memory
+		queries,
 	)
 	translationRouter := translation.NewTranslationHandler(translationService)
 	router.POST("/translate", translationRouter.TranslateHandler)
