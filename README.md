@@ -1,10 +1,13 @@
-# Project Go Solid Boilerplate
+# Project Nomenclature
 
-Open source Golang Application boilerplate
+Open-Source application to translate website into 150+ languages
 
-1. How do you structure a Golang project for production? | Golang Tutorial
+# Demo
 
-[![IMAGE ALT TEXT](https://i.ytimg.com/vi/I_FKeGXIaMs/hqdefault.jpg)](http://www.youtube.com/watch?v=I_FKeGXIaMs "How do you structure a Golang project for production? | Golang Tutorial")
+https://github.com/user-attachments/assets/f335d85c-53ce-4f90-a6e6-37343682f2e7
+
+
+
 
 ## MakeFile
 
