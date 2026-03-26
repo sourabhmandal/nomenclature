@@ -12,6 +12,7 @@
     TARGET_LANGUAGE: "bn",
     BATCH_SIZE: 50,
     DEBOUNCE_TIME: 150,
+    INITIAL_TRANSLATION_DELAY: 3000,
   };
 
   /* ================================
@@ -25,6 +26,7 @@
   let processedNodes = new WeakSet();
   let currentLocation = null;
   let routeVersion = 0;
+  let translationReady = false;
 
   /* ================================
      UTILITIES
@@ -152,6 +154,10 @@
 
   async function processNodes(nodes) {
     if (!nodes.length) return;
+    if (!translationReady) {
+      nodes.forEach((node) => pendingNodes.add(node));
+      return;
+    }
 
     isTranslating = true;
 
@@ -188,6 +194,13 @@
     processNodes(nodes);
   }
 
+  function flushPendingNodes() {
+    if (!translationReady || isTranslating || !pendingNodes.size) return;
+    const nodes = Array.from(pendingNodes);
+    pendingNodes.clear();
+    processNodes(nodes);
+  }
+
   /* ================================
      MUTATION OBSERVER
   =================================== */
@@ -220,6 +233,7 @@
   function debounceProcess() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
+      if (!translationReady) return;
       const nodes = Array.from(pendingNodes);
       pendingNodes.clear();
       processNodes(nodes);
@@ -248,7 +262,13 @@
 
   function routeChanged() {
     routeVersion++;
-    setTimeout(initialScan, 200);
+    setTimeout(() => {
+      if (translationReady) {
+        initialScan();
+      } else {
+        collectTextNodes().forEach((node) => pendingNodes.add(node));
+      }
+    }, 200);
   }
 
   /* ================================
@@ -284,7 +304,9 @@
 
   function retranslateAll() {
     processedNodes = new WeakSet();
-    initialScan();
+    if (translationReady) {
+      initialScan();
+    }
   }
 
   /* ================================
@@ -308,11 +330,11 @@
     container.style.fontFamily = "sans-serif";
 
     const select = document.createElement("select");
-    ["en", "bn", "hi", "fr", "de"].forEach((lang) => {
+    [{label: "English", value: "en"}, {label: "Bengali", value: "bn"}, {label: "Hindi", value: "hi"}, {label: "French", value: "fr"}, {label: "German", value: "de"}].forEach((lang) => {
       const opt = document.createElement("option");
-      opt.value = lang;
-      opt.textContent = lang.toUpperCase();
-      if (lang === currentLanguage) opt.selected = true;
+      opt.value = lang.value;
+      opt.textContent = lang.label;
+      if (lang.value === currentLanguage) opt.selected = true;
       select.appendChild(opt);
     });
 
@@ -348,9 +370,14 @@
 
   function boot() {
     injectUI();
-    initialScan();
     startObserver();
     interceptHistory();
+
+    setTimeout(() => {
+      translationReady = true;
+      initialScan();
+      flushPendingNodes();
+    }, CONFIG.INITIAL_TRANSLATION_DELAY);
   }
 
   start();

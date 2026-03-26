@@ -7,7 +7,7 @@ import (
 
 	"context"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -24,20 +24,20 @@ type Database interface {
 }
 
 type pgDatabase struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
 var (
 	dbInstance *pgDatabase
 )
 
-func NewDatabasePg(username, password, host, database, schema string, port int) (Database, *pgx.Conn) {
+func NewDatabasePg(username, password, host, database, schema string, port int) (Database, *pgxpool.Pool) {
 	// Reuse Connection
 	if dbInstance != nil {
 		return dbInstance, dbInstance.db
 	}
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
-	db, err := pgx.Connect(context.Background(), connStr)
+	db, err := pgxpool.New(context.Background(), connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,5 +77,6 @@ func (s *pgDatabase) Health() map[string]string {
 // If an error occurs while closing the connection, it returns the error.
 func (s *pgDatabase) Close() error {
 	log.Printf("Disconnected from database")
-	return s.db.Close(context.Background())
+	s.db.Close()
+	return nil
 }

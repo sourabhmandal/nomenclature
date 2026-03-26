@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	_ "github.com/joho/godotenv/autoload"
 
@@ -24,15 +24,14 @@ import (
 )
 
 type EnvConfig struct {
-	DBDatabase               string `env:"DB_DATABASE"`
-	DBUsername               string `env:"DB_USERNAME"`
-	DBPassword               string `env:"DB_PASSWORD"`
-	DBHost                   string `env:"DB_HOST"`
-	DBPort                   int    `env:"DB_PORT"`
-	DBSchema                 string `env:"DB_SCHEMA"`
-	ServerPort               int    `env:"SERVER_PORT"`
-	GoogleTranslateAPIKey    string `env:"GOOGLE_TRANSLATE_API_KEY"`
-	GoogleTranslateProjectID string `env:"GOOGLE_TRANSLATE_PROJECT_ID"`
+	DBDatabase         string `env:"DB_DATABASE"`
+	DBUsername         string `env:"DB_USERNAME"`
+	DBPassword         string `env:"DB_PASSWORD"`
+	DBHost             string `env:"DB_HOST"`
+	DBPort             int    `env:"DB_PORT"`
+	DBSchema           string `env:"DB_SCHEMA"`
+	ServerPort         int    `env:"SERVER_PORT"`
+	GoogleGeminiAPIKey string `env:"GOOGLE_GEMINI_API_KEY"`
 }
 
 var ENV EnvConfig = EnvConfig{}
@@ -74,7 +73,7 @@ func main() {
 	log.Println("Graceful shutdown complete.")
 }
 
-func registerRoutes(dbInst database.Database, db *pgx.Conn) *gin.Engine {
+func registerRoutes(dbInst database.Database, db *pgxpool.Pool) *gin.Engine {
 	// Declare Router
 	queries := repository.New(db)
 
@@ -105,7 +104,7 @@ func registerRoutes(dbInst database.Database, db *pgx.Conn) *gin.Engine {
 	userRouter.GET("/", userHandlers.GetAllUsers)
 
 	// translation service wiring (stub adapters)
-	googleTranslationProvider := translationproviders.NewGoogleTranslateProvider(ENV.GoogleTranslateProjectID)
+	googleTranslationProvider := translationproviders.NewGoogleTranslateProvider(ENV.GoogleGeminiAPIKey)
 	translationService := translation.NewTranslationService(
 		googleTranslationProvider,
 		queries,

@@ -25,7 +25,7 @@ func NewTranslationService(provider translationproviders.TranslationProvider, tr
 }
 
 func (s *translationService) Translate(req TranslationRequest) (TranslationResult, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	all_hashes := make([]string, 0, len(req.Text))
@@ -58,7 +58,7 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 		}
 	}
 
-	nonCachedTranslations := make([]string, 0)
+	nonCachedTranslations := make([]map[string]string, 0)
 	for _, text := range req.Text {
 		hash := GenerateHash(req.CompanyID, req.SourceLanguage, req.TargetLanguage, text)
 		found := false
@@ -69,7 +69,8 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 			}
 		}
 		if !found {
-			nonCachedTranslations = append(nonCachedTranslations, text)
+			textContext := DetectInputType(text)
+			nonCachedTranslations = append(nonCachedTranslations, textContext)
 		}
 	}
 
@@ -81,10 +82,10 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 
 	// If not found in memory, call the translation provider
 	translationResp, err := s.translator.Translate(translationproviders.TranslationRequest{
-		CompanyID:      req.CompanyID,
-		Text:           nonCachedTranslations,
-		SourceLanguage: req.SourceLanguage,
-		TargetLanguage: req.TargetLanguage,
+		CompanyID:       req.CompanyID,
+		TextWithContext: nonCachedTranslations,
+		SourceLanguage:  req.SourceLanguage,
+		TargetLanguage:  req.TargetLanguage,
 	})
 	if err != nil {
 		log.Printf("Primary provider failed: %v", err)
@@ -92,8 +93,9 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 	}
 
 	// Store in Memory
+	// in translationResp, we have map[string]string where key is original text and value is translated text. We need to convert it to []repository.TranslationInput for bulk insert.
 	var translationInputs []repository.TranslationInput
-	for _, translation := range translationResp {
+	for _, translation := range translationResp.Translations {
 		translationInputs = append(translationInputs, repository.TranslationInput{
 			CompanyID:       req.CompanyID,
 			NormalizedHash:  GenerateHash(req.CompanyID, req.SourceLanguage, req.TargetLanguage, translation.Original),
@@ -101,13 +103,13 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 			TargetLanguage:  req.TargetLanguage,
 			OriginalText:    translation.Original,
 			TranslatedText:  translation.Translated,
-			ConfidenceScore: translation.Confidence,
-			Provider:        translation.Provider,
+			ConfidenceScore: 90,
+			Provider:        "gemini",
 		})
 	}
 
 	var (
-		n                            = len(translationResp)
+		n                            = len(translationResp.Translations)
 		bulkInsertTranslationsParams repository.BulkInsertTranslationsParams
 	)
 	bulkInsertTranslationsParams = repository.BulkInsertTranslationsParams{
@@ -120,15 +122,15 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 		Column7: make([]pgtype.Numeric, n),
 		Column8: make([]string, n),
 	}
-	for i, translation := range translationResp {
+	for i, translation := range translationResp.Translations {
 		bulkInsertTranslationsParams.Column1[i] = req.CompanyID
 		bulkInsertTranslationsParams.Column2[i] = GenerateHash(req.CompanyID, req.SourceLanguage, req.TargetLanguage, translation.Original)
 		bulkInsertTranslationsParams.Column3[i] = req.SourceLanguage
 		bulkInsertTranslationsParams.Column4[i] = req.TargetLanguage
 		bulkInsertTranslationsParams.Column5[i] = translation.Original
 		bulkInsertTranslationsParams.Column6[i] = translation.Translated
-		bulkInsertTranslationsParams.Column7[i] = pgtype.Numeric{Int: big.NewInt(int64(translation.Confidence)), Valid: true, Exp: -3}
-		bulkInsertTranslationsParams.Column8[i] = translation.Provider
+		bulkInsertTranslationsParams.Column7[i] = pgtype.Numeric{Int: big.NewInt(int64(90)), Valid: true, Exp: -3}
+		bulkInsertTranslationsParams.Column8[i] = "gemini"
 	}
 	savedTranslationResponse, err = s.translationRepository.BulkInsertTranslations(ctx, &bulkInsertTranslationsParams)
 	if err != nil {
@@ -137,14 +139,14 @@ func (s *translationService) Translate(req TranslationRequest) (TranslationResul
 		// but without the confidence score and provider information.
 		return response, nil
 	}
-
-	for _, translation := range savedTranslationResponse {
+	providerName := "gemini"
+	for _, translation := range translationResp.Translations {
 		response.Text = append(response.Text, Translation{
-			NormalizedHash: translation.NormalizedHash,
-			Original:       translation.OriginalText,
-			Translated:     translation.TranslatedText,
-			Confidence:     float64(translation.ConfidenceScore.Int.Int64()),
-			Provider:       translation.Provider,
+			NormalizedHash: GenerateHash(req.CompanyID, req.SourceLanguage, req.TargetLanguage, translation.Original),
+			Original:       translation.Original,
+			Translated:     translation.Translated,
+			Confidence:     10,
+			Provider:       &providerName,
 		})
 	}
 
